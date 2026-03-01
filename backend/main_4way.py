@@ -93,7 +93,10 @@ async def api_frame():
 async def api_incidents():
     """Returns the latest captured incident snapshots (Crowd, Ambulance, Accident, Parking)."""
     if processor:
-        return JSONResponse(processor.get_incident_history())
+        if hasattr(processor, "get_incident_history"):
+            return JSONResponse(processor.get_incident_history())
+        elif hasattr(processor, "incident_history"):
+            return JSONResponse(list(processor.incident_history))
     return JSONResponse([])
 
 from pydantic import BaseModel
@@ -102,7 +105,68 @@ class SwapRequest(BaseModel):
 
 @app.post("/api/swap-video")
 async def api_swap_video(req: SwapRequest):
-    if processor:
+    if processor and hasattr(processor, "set_quadrant_mapping"):
         processor.set_quadrant_mapping(req.mapping)
     return {"status": "ok"}
+
+class IncidentReport(BaseModel):
+    type: str
+    description: str
+    timestamp: float
+    frame_b64: str
+
+@app.post("/api/add-incident")
+async def api_add_incident(inc: IncidentReport):
+    if processor:
+        try:
+            with processor.state_lock:
+                if not hasattr(processor, "incident_history"):
+                    processor.incident_history = []
+                processor.incident_history.insert(0, inc.model_dump() if hasattr(inc, "model_dump") else inc.dict())
+                if len(processor.incident_history) > 15:
+                    processor.incident_history.pop()
+        except AttributeError:
+            pass  # Fallback if standard processor is lacking history
+    return {"status": "ok"}
+
+@app.post("/api/open-live-camera")
+async def api_open_live_camera():
+    global processor, main_event_loop
+    
+    LIVE_FEED_URL = "http://192.168.55.66:8080/video"
+    
+    # 1. Stop the current 4-way processor safely
+    if processor:
+        processor.stop()
+    await asyncio.sleep(0.5)  # brief wait for thread cleanup
+    
+    # 2. Swap to the single live video processor and bind it to our active websocket output
+    from backend.video_processor import VideoProcessor
+    processor = VideoProcessor(video_path=LIVE_FEED_URL)
+    processor.video_path = LIVE_FEED_URL
+    
+    def on_state(state: dict):
+        if main_event_loop and main_event_loop.is_running():
+            asyncio.run_coroutine_threadsafe(broadcast(state), main_event_loop)
+            
+    processor.start(on_state=on_state)
+    return {"status": "switched_to_live"}
+
+@app.post("/api/close-live-camera")
+async def api_close_live_camera():
+    global processor, main_event_loop
+    
+    if processor:
+        processor.stop()
+    await asyncio.sleep(0.5)
+    
+    from backend.video_processor_4way import VideoProcessor4Way
+    processor = VideoProcessor4Way("north.mp4", "south.mp4", "east.mp4", "west.mp4")
+    
+    def on_state(state: dict):
+        if main_event_loop and main_event_loop.is_running():
+            asyncio.run_coroutine_threadsafe(broadcast(state), main_event_loop)
+            
+    processor.start(on_state=on_state)
+    return {"status": "switched_to_4way"}
 

@@ -19,7 +19,7 @@ def parse_args():
     p = argparse.ArgumentParser(description="AI Traffic 4-Way Web Dashboard")
     p.add_argument("--v_north", type=str, default="north.mp4")
     p.add_argument("--v_south", type=str, default="ambulance.mp4")
-    p.add_argument("--v_east",  type=str, default="vehicle-collision.mp4")
+    p.add_argument("--v_east",  type=str, default="east.mp4")
     p.add_argument("--v_west",  type=str, default="south.mp4")
     p.add_argument("--port",    type=int, default=8000)
     p.add_argument("--host",    type=str, default="0.0.0.0")

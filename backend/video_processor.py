@@ -70,6 +70,9 @@ class VideoProcessor:
         self.latest_alerts:  List = []
         self.latest_signals: Dict = {}
         
+        self.incident_history: List[Dict] = []
+        self._last_incident_time: float = 0.0
+        
         # Callbacks (called from processing thread)
         self._on_state: Optional[Callable] = None
     
@@ -143,17 +146,70 @@ class VideoProcessor:
                 self.latest_signals = self.optimizer.get_metrics()
             
             annotated = frame.copy()
-            self.lane_mgr.draw_lanes(annotated)
+            
+            # The single live camera is a general feed, so we hide the artificial 4-way lane polygons, 
+            # signal panel, and bottom overlays here to keep the video feed clean.
+            # self.lane_mgr.draw_lanes(annotated)
             
             if current_detections:
                 self.detector.draw(annotated, current_detections)
             if current_tracks:
                 self.tracker.draw_tracks(annotated, current_tracks)
                 
-            self.optimizer.draw_signal_panel(annotated, x=10, y=10)
-            self.analyzer.draw_overlay(annotated, current_lane_stats)
+            # self.optimizer.draw_signal_panel(annotated, x=10, y=10)
+            # self.analyzer.draw_overlay(annotated, current_lane_stats)
+            
+            # Show Live Tracking Latency on screen
+            latency_ms = (time.time() - start_time) * 1000
+            cv2.putText(annotated, f"Latency: {latency_ms:.1f} ms", (10, 18), 
+                        cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 255, 255), 2)
             
             self.latest_frame = annotated
+            
+            # ── Incident Detection Pipeline ──
+            now = time.time()
+            if now - self._last_incident_time > 10.0:  # 10s cooldown between captured incidents
+                incident_type = None
+                desc = None
+                
+                person_count = sum(1 for t in current_tracks if t.is_person)
+                critical_alerts = [a for a in self.latest_alerts if a['severity'] in ('critical', 'high')]
+                
+                if critical_alerts:
+                    for a in critical_alerts:
+                        if a.get("type") == "accident":
+                            incident_type = "accident"
+                            desc = a.get("message")
+                            break
+                        elif "AMBULANCE" in a.get("message", "").upper():
+                            incident_type = "ambulance"
+                            desc = f"Ambulance detected passing through {a.get('lane', 'local')} view."
+                            break
+                
+                if not incident_type and person_count > 12:
+                    incident_type = "crowd"
+                    desc = f"Large crowd of {person_count} pedestrians crossing."
+                
+                if not incident_type:
+                    for lane, stats in current_lane_stats.items():
+                        if stats.max_wait_time > 120.0:
+                            incident_type = "parking"
+                            desc = f"Potential stalled or illegally parked vehicle in view."
+                            break
+                
+                if incident_type:
+                    _, buf = cv2.imencode(".jpg", annotated, [cv2.IMWRITE_JPEG_QUALITY, 85])
+                    with self.state_lock:
+                        self.incident_history.insert(0, {
+                            "type": incident_type,
+                            "description": desc,
+                            "timestamp": now,
+                            "frame_b64": base64.b64encode(buf.tobytes()).decode("utf-8")
+                        })
+                        if len(self.incident_history) > 15:
+                            self.incident_history.pop()
+                    self._last_incident_time = now
+            # ─────────────────────────────────
             
             if self._on_state:
                 try:
@@ -224,3 +280,8 @@ class VideoProcessor:
             "chart":   self.analyzer.get_chart_data(),
             "frame_b64": self.get_b64_frame(),
         }
+
+    def get_incident_history(self) -> List[Dict]:
+        """Return a copy of the recent incident history."""
+        with self.state_lock:
+            return list(self.incident_history)

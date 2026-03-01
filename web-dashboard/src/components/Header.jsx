@@ -49,6 +49,11 @@ export default function Header({ metrics, uptime, isConnected, currentView, setC
     const co2Reduced = fuelSaved * 2.31;
     // ───────────────────────────────────────
 
+    const [isLiveMode, setIsLiveMode] = useState(false);
+
+    // ... (rest of the component) ...
+    // Note: I am placing the state inline as a temporary toggle.
+
     return (
         <header>
             <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
@@ -87,20 +92,21 @@ export default function Header({ metrics, uptime, isConnected, currentView, setC
                     ⚠️ Incident Feed
                 </button>
                 <div style={{ width: '1px', height: '20px', background: 'rgba(255,255,255,0.1)', margin: '0 4px' }}></div>
-                
+
                 <div ref={dropdownRef} style={{ position: 'relative' }}>
                     <button
                         onClick={() => setIsDropdownOpen(!isDropdownOpen)}
+                        disabled={isLiveMode}
                         style={{
                             background: isDropdownOpen ? '#020617' : '#020617',
-                            color: '#fff',
+                            color: isLiveMode ? 'var(--muted)' : '#fff',
                             border: '1px solid',
                             borderColor: isDropdownOpen ? 'rgba(255,255,255,0.2)' : 'rgba(255,255,255,0.08)',
                             padding: '8px 16px',
                             borderRadius: '8px',
                             fontSize: '13px',
                             fontWeight: '600',
-                            cursor: 'pointer',
+                            cursor: isLiveMode ? 'not-allowed' : 'pointer',
                             display: 'flex',
                             alignItems: 'center',
                             gap: '8px',
@@ -109,13 +115,13 @@ export default function Header({ metrics, uptime, isConnected, currentView, setC
                         }}
                     >
                         <span>{selectedLayout.label}</span>
-                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" 
-                             style={{ transition: 'transform 0.2s', transform: isDropdownOpen ? 'rotate(180deg)' : 'rotate(0deg)' }}>
+                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"
+                            style={{ transition: 'transform 0.2s', transform: isDropdownOpen ? 'rotate(180deg)' : 'rotate(0deg)' }}>
                             <polyline points="6 9 12 15 18 9"></polyline>
                         </svg>
                     </button>
 
-                    {isDropdownOpen && (
+                    {isDropdownOpen && !isLiveMode && (
                         <div style={{
                             position: 'absolute',
                             top: 'calc(100% + 8px)',
@@ -178,6 +184,52 @@ export default function Header({ metrics, uptime, isConnected, currentView, setC
                         </div>
                     )}
                 </div>
+
+                <div style={{ width: '1px', height: '20px', background: 'rgba(255,255,255,0.1)', margin: '0 4px' }}></div>
+
+                {!isLiveMode ? (
+                    <button
+                        onClick={() => {
+                            fetch(`http://${window.location.hostname}:8000/api/open-live-camera`, { method: 'POST' })
+                                .then(() => setIsLiveMode(true))
+                                .catch(err => console.error('Failed to open live camera', err));
+                        }}
+                        style={{
+                            background: 'rgba(56, 189, 248, 0.15)',
+                            color: '#38bdf8',
+                            border: '1px solid rgba(56, 189, 248, 0.4)',
+                            padding: '8px 16px', borderRadius: '8px',
+                            fontSize: '13px', fontWeight: '600', cursor: 'pointer',
+                            transition: 'all 0.2s',
+                            display: 'flex', alignItems: 'center', gap: '6px'
+                        }}
+                        onMouseEnter={e => e.currentTarget.style.background = 'rgba(56, 189, 248, 0.25)'}
+                        onMouseLeave={e => e.currentTarget.style.background = 'rgba(56, 189, 248, 0.15)'}
+                    >
+                        🎥 Start Live Feed
+                    </button>
+                ) : (
+                    <button
+                        onClick={() => {
+                            fetch(`http://${window.location.hostname}:8000/api/close-live-camera`, { method: 'POST' })
+                                .then(() => setIsLiveMode(false))
+                                .catch(err => console.error('Failed to close live camera', err));
+                        }}
+                        style={{
+                            background: 'rgba(239, 68, 68, 0.15)',
+                            color: '#ef4444',
+                            border: '1px solid rgba(239, 68, 68, 0.4)',
+                            padding: '8px 16px', borderRadius: '8px',
+                            fontSize: '13px', fontWeight: '600', cursor: 'pointer',
+                            transition: 'all 0.2s',
+                            display: 'flex', alignItems: 'center', gap: '6px'
+                        }}
+                        onMouseEnter={e => e.currentTarget.style.background = 'rgba(239, 68, 68, 0.25)'}
+                        onMouseLeave={e => e.currentTarget.style.background = 'rgba(239, 68, 68, 0.15)'}
+                    >
+                        ⏹ Stop Live Feed
+                    </button>
+                )}
             </div>
 
             <style>{`
