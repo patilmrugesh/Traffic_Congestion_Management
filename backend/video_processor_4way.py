@@ -143,8 +143,7 @@ class VideoProcessor4Way:
             # ── Incident Detection Pipeline ──
             now = time.time()
             if now - self._last_incident_time > 10.0:  # 10s cooldown between captured incidents
-                incident_type = None
-                desc = None
+                detected_incidents = []
                 
                 person_count = sum(1 for t in current_tracks if t.is_person)
                 
@@ -153,39 +152,53 @@ class VideoProcessor4Way:
                 
                 if critical_alerts:
                     for a in critical_alerts:
-                        if a.get("type") == "accident":
-                            incident_type = "accident"
-                            desc = a["message"]
+                        if a.get("type") == "accident" or a.get("type") == "scene" or a.get("type") == "stall":
+                            # Use exact type field name 'accident'
+                            pass
+                        if a.get("type") == "accident" or a.get("alert_type") == "accident":
+                            detected_incidents.append({
+                                "type": "accident",
+                                "description": a["message"]
+                            })
                             break
                         elif "AMBULANCE" in a["message"]:
-                            incident_type = "ambulance"
-                            desc = f"Ambulance detected passing through {a['lane']} lane."
+                            detected_incidents.append({
+                                "type": "ambulance",
+                                "description": f"Ambulance detected passing through {a['lane']} lane."
+                            })
                             break
                 
                 # Check for Crowd
-                if not incident_type and person_count > 12:
-                    incident_type = "crowd"
-                    desc = f"Large crowd of {person_count} pedestrians crossing."
+                if person_count > 12:
+                    detected_incidents.append({
+                                "type": "crowd",
+                                "description": f"Large crowd of {person_count} pedestrians crossing."
+                    })
                 
                 # Check for Suspicious Stalls
-                if not incident_type:
+                is_accident_running = any(idx['type'] == 'accident' for idx in detected_incidents)
+                if not is_accident_running:
                     for lane, stats in current_lane_stats.items():
                         if stats.max_wait_time > 120.0: # 2 minutes
-                            incident_type = "parking"
-                            desc = f"Potential stalled or illegally parked vehicle in {lane} lane."
+                            detected_incidents.append({
+                                "type": "parking",
+                                "description": f"Potential stalled or illegally parked vehicle in {lane} lane."
+                            })
                             break
                 
-                if incident_type:
+                if detected_incidents:
                     _, buf = cv2.imencode(".jpg", annotated, [cv2.IMWRITE_JPEG_QUALITY, 85])
+                    b64_frame = base64.b64encode(buf.tobytes()).decode("utf-8")
                     with self.state_lock:
-                        self.incident_history.insert(0, {
-                            "type": incident_type,
-                            "description": desc,
-                            "timestamp": now,
-                            "frame_b64": base64.b64encode(buf.tobytes()).decode("utf-8")
-                        })
+                        for inc in detected_incidents:
+                            self.incident_history.insert(0, {
+                                "type": inc["type"],
+                                "description": inc["description"],
+                                "timestamp": now,
+                                "frame_b64": b64_frame
+                            })
                         # Keep only the last 15 incidents in memory
-                        if len(self.incident_history) > 15:
+                        while len(self.incident_history) > 15:
                             self.incident_history.pop()
                     self._last_incident_time = now
             # ─────────────────────────────────
