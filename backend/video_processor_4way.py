@@ -66,7 +66,13 @@ class VideoProcessor4Way:
         for c in candidates:
             if c is None: continue
             if c == 0: return 0
-            if os.path.isfile(str(c)): return c
+            
+            # Check if it's a URL
+            s_c = str(c)
+            if s_c.startswith(("http://", "https://", "rtsp://", "rtmp://")):
+                return s_c
+                
+            if os.path.isfile(s_c): return c
         return 0
 
     def start(self, on_state: Optional[Callable] = None):

@@ -84,7 +84,13 @@ class VideoProcessor:
                 continue
             if c == 0:
                 return 0  # Webcam
-            if os.path.isfile(str(c)):
+            
+            # Check if it's a URL
+            s_c = str(c)
+            if s_c.startswith(("http://", "https://", "rtsp://", "rtmp://")):
+                return s_c
+                
+            if os.path.isfile(s_c):
                 return c
         print("[VideoProcessor] WARNING: No video found. Defaulting to webcam (0).")
         return 0

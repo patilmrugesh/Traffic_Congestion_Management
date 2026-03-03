@@ -14,18 +14,6 @@ import webbrowser
 import threading
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-
-def parse_args():
-    p = argparse.ArgumentParser(description="AI Traffic 4-Way Web Dashboard")
-    p.add_argument("--v_north", type=str, default="north.mp4")
-    p.add_argument("--v_south", type=str, default="ambulance.mp4")
-    p.add_argument("--v_east",  type=str, default="east.mp4")
-    p.add_argument("--v_west",  type=str, default="south.mp4")
-    p.add_argument("--port",    type=int, default=8000)
-    p.add_argument("--host",    type=str, default="0.0.0.0")
-    p.add_argument("--no-browser", action="store_true")
-    return p.parse_args()
-
 def open_browser(port: int, delay: float = 2.5):
     def _open():
         time.sleep(delay)
@@ -33,6 +21,17 @@ def open_browser(port: int, delay: float = 2.5):
         print(f"[Launcher] Opening dashboard: {url}")
         webbrowser.open(url)
     threading.Thread(target=_open, daemon=True).start()
+
+def parse_args():
+    parser = argparse.ArgumentParser(description="AI Traffic 4-Way Dashboard")
+    parser.add_argument("--v_north", type=str, default="north.mp4", help="Path to North video")
+    parser.add_argument("--v_south", type=str, default="west1.mp4", help="Path to South video")
+    parser.add_argument("--v_east", type=str, default="south.mp4", help="Path to East video")
+    parser.add_argument("--v_west", type=str, default="west.mp4", help="Path to West video")
+    parser.add_argument("--port", type=int, default=8000, help="Server port")
+    parser.add_argument("--host", type=str, default="0.0.0.0", help="Server host")
+    parser.add_argument("--no-browser", action="store_true", help="Don't open browser")
+    return parser.parse_args()
 
 def main():
     args = parse_args()

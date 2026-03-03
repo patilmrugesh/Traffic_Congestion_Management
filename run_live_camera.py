@@ -9,12 +9,11 @@ import base64
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 from backend.video_processor import VideoProcessor
+import config
 
 # The live feed URL from IP Webcam
 # IP Webcam typically streams raw video over port 8080 at `/video`.
-LIVE_FEED_URL = "http://192.168.55.66:8080/video"
-# If the above doesn't work, try uncommenting the HTTPS link:
-# LIVE_FEED_URL = "https://192.168.55.66:8080/video"
+LIVE_FEED_URL = config.LIVE_FEED_URL
 
 def check_and_send_incidents(vp, last_time):
     now = time.time()

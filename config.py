@@ -81,3 +81,10 @@ OPEN_BROWSER_ON_START = True
 # ─── Dashboard ────────────────────────────────────────────────────────────────
 DASHBOARD_TITLE = "AI Traffic De-Congestion System"
 STREAM_JPEG_QUALITY = 75  # JPEG compression quality for streaming (1–100)
+
+# ─── Camera Sources ──────────────────────────────────────────────────────────
+# Use the user-provided camera URLs here.
+LIVE_FEED_URL = "http://10.197.135.215:8080/video"
+# Alternatives:
+# LIVE_FEED_URL = "https://10.197.135.215:8080/video"
+# LIVE_FEED_URL = "http://[2409:4102:6017:f767:ac11:49ff:fe87:679e]:8080/video"

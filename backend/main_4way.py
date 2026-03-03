@@ -133,7 +133,7 @@ async def api_add_incident(inc: IncidentReport):
 async def api_open_live_camera():
     global processor, main_event_loop
     
-    LIVE_FEED_URL = "http://192.168.55.66:8080/video"
+    LIVE_FEED_URL = config.LIVE_FEED_URL
     
     # 1. Stop the current 4-way processor safely
     if processor:
